@@ -97,8 +97,9 @@ export default function EquipmentForm({ onClose, equipment }: EquipmentFormProps
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-black">Name</label>
+            <label htmlFor="name" className="block text-sm font-medium text-black">Name</label>
             <input
+              id="name"
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -109,8 +110,9 @@ export default function EquipmentForm({ onClose, equipment }: EquipmentFormProps
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-black">Category</label>
+            <label htmlFor="category" className="block text-sm font-medium text-black">Category</label>
             <select
+              id="category"
               value={formData.category}
               onChange={(e) => setFormData({ ...formData, category: e.target.value as SportEquipment['category'] })}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-black"
@@ -124,8 +126,9 @@ export default function EquipmentForm({ onClose, equipment }: EquipmentFormProps
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-black">Price</label>
+            <label htmlFor="price" className="block text-sm font-medium text-black">Price</label>
             <input
+              id="price"
               type="number"
               value={formData.price}
               onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
@@ -136,8 +139,9 @@ export default function EquipmentForm({ onClose, equipment }: EquipmentFormProps
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-black">Brand</label>
+            <label htmlFor="brand" className="block text-sm font-medium text-black">Brand</label>
             <input
+              id="brand"
               type="text"
               value={formData.brand}
               onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
@@ -148,8 +152,9 @@ export default function EquipmentForm({ onClose, equipment }: EquipmentFormProps
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-black">In Stock</label>
+            <label htmlFor="inStock" className="block text-sm font-medium text-black">In Stock</label>
             <input
+              id="inStock"
               type="number"
               value={formData.inStock}
               onChange={(e) => setFormData({ ...formData, inStock: Number(e.target.value) })}
@@ -160,8 +165,9 @@ export default function EquipmentForm({ onClose, equipment }: EquipmentFormProps
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-black">Description</label>
+            <label htmlFor="description" className="block text-sm font-medium text-black">Description</label>
             <textarea
+              id="description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-black"
@@ -171,8 +177,9 @@ export default function EquipmentForm({ onClose, equipment }: EquipmentFormProps
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-black">Condition</label>
+            <label htmlFor="condition" className="block text-sm font-medium text-black">Condition</label>
             <select
+              id="condition"
               value={formData.condition}
               onChange={(e) => setFormData({ ...formData, condition: e.target.value as SportEquipment['condition'] })}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-black"
@@ -185,8 +192,9 @@ export default function EquipmentForm({ onClose, equipment }: EquipmentFormProps
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-black">Image</label>
+            <label htmlFor="image" className="block text-sm font-medium text-black">Image</label>
             <input
+              id="image"
               type="file"
               accept="image/*"
               onChange={handleImageChange}
