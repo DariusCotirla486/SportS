@@ -14,7 +14,7 @@ import {
   LineElement,
 } from 'chart.js';
 import { Bar, Pie, Line } from 'react-chartjs-2';
-import { SportEquipment } from '../types/types';
+import { SportEquipment } from '@/lib/db';
 
 ChartJS.register(
   CategoryScale,
@@ -32,8 +32,35 @@ interface EquipmentChartsProps {
   equipment: SportEquipment[];
 }
 
+interface ChartData {
+  priceDistribution: {
+    labels: string[];
+    datasets: {
+      label: string;
+      data: number[];
+      backgroundColor: string;
+    }[];
+  };
+  categoryDistribution: {
+    labels: string[];
+    datasets: {
+      data: number[];
+      backgroundColor: string[];
+    }[];
+  };
+  priceTrend: {
+    labels: string[];
+    datasets: {
+      label: string;
+      data: number[];
+      borderColor: string;
+      tension: number;
+    }[];
+  };
+}
+
 export default function EquipmentCharts({ equipment }: EquipmentChartsProps) {
-  const [chartData, setChartData] = useState({
+  const [chartData, setChartData] = useState<ChartData>({
     priceDistribution: {
       labels: ['$0-50', '$51-100', '$101-200', '$201+'],
       datasets: [{
@@ -118,7 +145,7 @@ export default function EquipmentCharts({ equipment }: EquipmentChartsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
       <div className="bg-white p-4 rounded-lg shadow-md">
-        <h3 className="text-lg font-semibold mb-4">Price Distribution</h3>
+        <h3 className="text-lg font-semibold mb-4 text-black">Price Distribution</h3>
         <Bar
           data={chartData.priceDistribution}
           options={{
@@ -132,7 +159,7 @@ export default function EquipmentCharts({ equipment }: EquipmentChartsProps) {
         />
       </div>
       <div className="bg-white p-4 rounded-lg shadow-md">
-        <h3 className="text-lg font-semibold mb-4">Category Distribution</h3>
+        <h3 className="text-lg font-semibold mb-4 text-black">Category Distribution</h3>
         <Pie
           data={chartData.categoryDistribution}
           options={{
@@ -146,7 +173,7 @@ export default function EquipmentCharts({ equipment }: EquipmentChartsProps) {
         />
       </div>
       <div className="bg-white p-4 rounded-lg shadow-md">
-        <h3 className="text-lg font-semibold mb-4">Price Trend</h3>
+        <h3 className="text-lg font-semibold mb-4 text-black">Price Trend</h3>
         <Line
           data={chartData.priceTrend}
           options={{

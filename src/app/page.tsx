@@ -1,90 +1,82 @@
 'use client';
 
-import { useState } from 'react';
-import { EquipmentProvider } from '../context/EquipmentContext';
-import EquipmentList from '../components/EquipmentList';
-import EquipmentForm from '../components/EquipmentForm';
-import EquipmentCharts from '../components/EquipmentCharts';
-import { useEquipment } from '../context/EquipmentContext';
-
-function MainContent() {
-  const [showForm, setShowForm] = useState(false);
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [priceSort, setPriceSort] = useState<'none' | 'high-low' | 'low-high'>('none');
-  const { state } = useEquipment();
-
-  const categories = ['All', 'Football', 'Basketball', 'Tennis', 'Other'];
-  const saleCategory = 'Football';
-  const salePercentage = 80;
-
-  return (
-    <main className="container mx-auto px-4 py-8 max-w-7xl relative">
-      {/* Flash Sale Banner */}
-      <div className="fixed left-4 top-4 z-50">
-        <div className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg animate-pulse">
-          <h2 className="text-xl font-bold">Flash Sale!</h2>
-          <p className="text-sm">{saleCategory} - {salePercentage}%</p>
-        </div>
-      </div>
-
-      <div className="text-center mb-8">
-        <p className="text-red-500 mb-2">Check Our Product</p>
-        <h1 className="text-3xl font-bold">Brand New Sport Equipment</h1>
-      </div>
-
-      {/* Charts Section */}
-      <EquipmentCharts equipment={state.equipment} />
-
-      {/* Navigation Categories */}
-      <div className="flex justify-center gap-8 mb-12">
-        {categories.map((category) => (
-          <button
-            key={category}
-            onClick={() => setActiveCategory(category)}
-            className={`px-4 py-2 rounded-full ${
-              activeCategory === category
-                ? 'bg-black text-white'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            {category}
-          </button>
-        ))}
-      </div>
-
-      <EquipmentList activeCategory={activeCategory} priceSort={priceSort} />
-      
-      <div className="flex gap-4 mt-8">
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex-1 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors"
-        >
-          Add a product
-        </button>
-        <select
-          value={priceSort}
-          onChange={(e) => setPriceSort(e.target.value as typeof priceSort)}
-          className="flex-1 bg-purple-600 text-white py-3 px-4 rounded-lg hover:bg-purple-700 transition-colors appearance-none cursor-pointer relative"
-        >
-          <option value="none">Sort by Price</option>
-          <option value="high-low">Price: High to Low</option>
-          <option value="low-high">Price: Low to High</option>
-        </select>
-      </div>
-
-      {showForm && (
-        <EquipmentForm
-          onClose={() => setShowForm(false)}
-        />
-      )}
-    </main>
-  );
-}
+import { useState, useEffect } from 'react';
+import { SportEquipment } from '@/lib/db';
+import EquipmentList from '@/components/EquipmentList';
+import EquipmentForm from '@/components/EquipmentForm';
+import FilterSort from '@/components/FilterSort';
+import EquipmentCharts from '@/components/EquipmentCharts';
 
 export default function Home() {
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [priceSort, setPriceSort] = useState<'none' | 'high-low' | 'low-high'>('none');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [equipment, setEquipment] = useState<SportEquipment[]>([]);
+
+  useEffect(() => {
+    const fetchEquipment = async () => {
+      try {
+        const response = await fetch('/api/equipment');
+        const data = await response.json();
+        setEquipment(data);
+      } catch (error) {
+        console.error('Error fetching equipment:', error);
+      }
+    };
+    fetchEquipment();
+  }, []);
+
+  const handleAddEquipment = async (newEquipment: SportEquipment) => {
+    try {
+      const response = await fetch('/api/equipment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newEquipment)
+      });
+      if (!response.ok) {
+        throw new Error('Failed to add equipment');
+      }
+      const addedEquipment = await response.json();
+      setEquipment(prev => [...prev, addedEquipment]);
+      setShowAddForm(false);
+    } catch (error) {
+      console.error('Error adding equipment:', error);
+    }
+  };
+
   return (
-    <EquipmentProvider>
-      <MainContent />
-    </EquipmentProvider>
+    <main className="min-h-screen bg-gray-100">
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Sports Equipment Store</h1>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Add New Equipment
+          </button>
+        </div>
+
+        <EquipmentCharts equipment={equipment} />
+
+        <FilterSort
+          onCategoryChange={setActiveCategory}
+          onPriceSortChange={setPriceSort}
+          activeCategory={activeCategory}
+          priceSort={priceSort}
+        />
+
+        <EquipmentList activeCategory={activeCategory} priceSort={priceSort} />
+
+        {showAddForm && (
+          <EquipmentForm
+            onClose={() => setShowAddForm(false)}
+            onUpdate={handleAddEquipment}
+          />
+        )}
+      </div>
+    </main>
   );
 }

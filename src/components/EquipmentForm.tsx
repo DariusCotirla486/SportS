@@ -1,92 +1,55 @@
 'use client';
 
-import { useState } from 'react';
-import { useEquipment } from '../context/EquipmentContext';
-import { SportEquipment } from '../types/types';
+import { SportEquipment } from '@/lib/db';
+import { useState, useEffect } from 'react';
 
 interface EquipmentFormProps {
   onClose: () => void;
   equipment?: SportEquipment;
+  onUpdate?: (equipment: SportEquipment) => void;
 }
 
-export default function EquipmentForm({ onClose, equipment }: EquipmentFormProps) {
-  const { dispatch } = useEquipment();
-  const [formData, setFormData] = useState<SportEquipment>({
-    id: equipment?.id || '',
-    name: equipment?.name || '',
-    category: equipment?.category || 'Ball Sports',
-    price: equipment?.price || 0,
-    brand: equipment?.brand || '',
-    inStock: equipment?.inStock || 0,
-    description: equipment?.description || '',
-    condition: equipment?.condition || 'New',
-    imageUrl: equipment?.imageUrl || '',
+export default function EquipmentForm({ onClose, equipment, onUpdate }: EquipmentFormProps) {
+  const [formData, setFormData] = useState<Partial<SportEquipment>>({
+    name: '',
+    category: 'Team Sports',
+    price: 0,
+    brand: '',
+    inStock: 0,
+    description: '',
+    condition: 'New',
+    imageUrl: 'https://placehold.co/400x400/blue/white?text=New'
   });
 
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(equipment?.imageUrl || null);
-
-  const [errors, setErrors] = useState<Partial<Record<keyof SportEquipment, string>>>({});
-
-  const validateForm = () => {
-    const newErrors: Partial<Record<keyof SportEquipment, string>> = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    }
-    if (formData.price <= 0) {
-      newErrors.price = 'Price must be greater than 0';
-    }
-    if (!formData.brand.trim()) {
-      newErrors.brand = 'Brand is required';
-    }
-    if (formData.inStock < 0) {
-      newErrors.inStock = 'Stock cannot be negative';
-    }
-    if (!formData.description.trim()) {
-      newErrors.description = 'Description is required';
-    }
-    if (!formData.imageUrl?.trim()) {
-      newErrors.imageUrl = 'Image URL is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
-        setFormData(prev => ({ ...prev, imageUrl: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
+  useEffect(() => {
     if (equipment) {
-      dispatch({
-        type: 'UPDATE_EQUIPMENT',
-        payload: { id: equipment.id, data: formData },
-      });
-    } else {
-      dispatch({
-        type: 'ADD_EQUIPMENT',
-        payload: formData,
-      });
+      setFormData(equipment);
     }
+  }, [equipment]);
 
-    onClose();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (equipment && onUpdate) {
+        // Update existing equipment
+        onUpdate({ ...equipment, ...formData } as SportEquipment);
+      } else {
+        // Create new equipment
+        const response = await fetch('/api/equipment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+        if (!response.ok) {
+          throw new Error('Failed to create equipment');
+        }
+      }
+      onClose();
+    } catch (error) {
+      console.error('Error saving equipment:', error);
+    }
   };
 
   return (
@@ -97,138 +60,110 @@ export default function EquipmentForm({ onClose, equipment }: EquipmentFormProps
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-black">Name</label>
+            <label className="block text-sm font-medium text-gray-700">Name</label>
             <input
-              id="name"
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-black"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               required
             />
-            {errors.name && <p className="text-red-500 text-sm">{errors.name}</p>}
           </div>
-
           <div>
-            <label htmlFor="category" className="block text-sm font-medium text-black">Category</label>
+            <label className="block text-sm font-medium text-gray-700">Category</label>
             <select
-              id="category"
               value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value as SportEquipment['category'] })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-black"
+              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               required
             >
-              <option value="Ball Sports">Ball Sports</option>
               <option value="Team Sports">Team Sports</option>
+              <option value="Ball Sports">Ball Sports</option>
               <option value="Training">Training</option>
               <option value="Accessories">Accessories</option>
             </select>
           </div>
-
           <div>
-            <label htmlFor="price" className="block text-sm font-medium text-black">Price</label>
+            <label className="block text-sm font-medium text-gray-700">Price</label>
             <input
-              id="price"
               type="number"
               value={formData.price}
-              onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-black"
+              onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               required
+              min="0"
+              step="0.01"
             />
-            {errors.price && <p className="text-red-500 text-sm">{errors.price}</p>}
           </div>
-
           <div>
-            <label htmlFor="brand" className="block text-sm font-medium text-black">Brand</label>
+            <label className="block text-sm font-medium text-gray-700">Brand</label>
             <input
-              id="brand"
               type="text"
               value={formData.brand}
               onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-black"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               required
             />
-            {errors.brand && <p className="text-red-500 text-sm">{errors.brand}</p>}
           </div>
-
           <div>
-            <label htmlFor="inStock" className="block text-sm font-medium text-black">In Stock</label>
+            <label className="block text-sm font-medium text-gray-700">In Stock</label>
             <input
-              id="inStock"
               type="number"
               value={formData.inStock}
-              onChange={(e) => setFormData({ ...formData, inStock: Number(e.target.value) })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-black"
+              onChange={(e) => setFormData({ ...formData, inStock: parseInt(e.target.value) })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               required
+              min="0"
             />
-            {errors.inStock && <p className="text-red-500 text-sm">{errors.inStock}</p>}
           </div>
-
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-black">Description</label>
+            <label className="block text-sm font-medium text-gray-700">Description</label>
             <textarea
-              id="description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-black"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              rows={3}
               required
             />
-            {errors.description && <p className="text-red-500 text-sm">{errors.description}</p>}
           </div>
-
           <div>
-            <label htmlFor="condition" className="block text-sm font-medium text-black">Condition</label>
+            <label className="block text-sm font-medium text-gray-700">Condition</label>
             <select
-              id="condition"
               value={formData.condition}
-              onChange={(e) => setFormData({ ...formData, condition: e.target.value as SportEquipment['condition'] })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-black"
+              onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               required
             >
               <option value="New">New</option>
-              <option value="Used">Used</option>
-              <option value="Refurbished">Refurbished</option>
+              <option value="Like New">Like New</option>
+              <option value="Good">Good</option>
+              <option value="Fair">Fair</option>
+              <option value="Poor">Poor</option>
             </select>
           </div>
-
           <div>
-            <label htmlFor="image" className="block text-sm font-medium text-black">Image</label>
+            <label className="block text-sm font-medium text-gray-700">Image URL</label>
             <input
-              id="image"
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="mt-1 block w-full text-sm text-black
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-md file:border-0
-                file:text-sm file:font-semibold
-                file:bg-blue-50 file:text-blue-700
-                hover:file:bg-blue-100"
+              type="url"
+              value={formData.imageUrl}
+              onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              required
             />
-            {previewUrl && (
-              <div className="mt-2">
-                <img
-                  src={previewUrl}
-                  alt="Preview"
-                  className="w-32 h-32 object-cover rounded-lg"
-                />
-              </div>
-            )}
           </div>
-
-          <div className="flex justify-end space-x-2">
+          <div className="flex justify-end space-x-3 mt-6">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
-              {equipment ? 'Update' : 'Add'}
+              {equipment ? 'Update' : 'Add'} Equipment
             </button>
           </div>
         </form>
