@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -32,67 +32,8 @@ interface EquipmentChartsProps {
   equipment: SportEquipment[];
 }
 
-interface ChartData {
-  priceDistribution: {
-    labels: string[];
-    datasets: {
-      label: string;
-      data: number[];
-      backgroundColor: string;
-    }[];
-  };
-  categoryDistribution: {
-    labels: string[];
-    datasets: {
-      data: number[];
-      backgroundColor: string[];
-    }[];
-  };
-  priceTrend: {
-    labels: string[];
-    datasets: {
-      label: string;
-      data: number[];
-      borderColor: string;
-      tension: number;
-    }[];
-  };
-}
-
 export default function EquipmentCharts({ equipment }: EquipmentChartsProps) {
-  const [chartData, setChartData] = useState<ChartData>({
-    priceDistribution: {
-      labels: ['$0-50', '$51-100', '$101-200', '$201+'],
-      datasets: [{
-        label: 'Number of Items',
-        data: [0, 0, 0, 0],
-        backgroundColor: 'rgba(54, 162, 235, 0.5)',
-      }],
-    },
-    categoryDistribution: {
-      labels: ['Football', 'Basketball', 'Tennis', 'Other'],
-      datasets: [{
-        data: [0, 0, 0, 0],
-        backgroundColor: [
-          'rgba(255, 99, 132, 0.5)',
-          'rgba(54, 162, 235, 0.5)',
-          'rgba(255, 206, 86, 0.5)',
-          'rgba(75, 192, 192, 0.5)',
-        ],
-      }],
-    },
-    priceTrend: {
-      labels: [],
-      datasets: [{
-        label: 'Average Price',
-        data: [],
-        borderColor: 'rgb(75, 192, 192)',
-        tension: 0.1,
-      }],
-    },
-  });
-
-  useEffect(() => {
+  const chartData = useMemo(() => {
     // Update price distribution
     const priceRanges = [0, 0, 0, 0];
     equipment.forEach(item => {
@@ -117,29 +58,37 @@ export default function EquipmentCharts({ equipment }: EquipmentChartsProps) {
     const priceTrend = lastItems.map(item => item.price);
     const labels = lastItems.map(item => item.name);
 
-    setChartData({
+    return {
       priceDistribution: {
-        ...chartData.priceDistribution,
+        labels: ['$0-50', '$51-100', '$101-200', '$201+'],
         datasets: [{
-          ...chartData.priceDistribution.datasets[0],
+          label: 'Number of Items',
           data: priceRanges,
+          backgroundColor: 'rgba(54, 162, 235, 0.5)',
         }],
       },
       categoryDistribution: {
-        ...chartData.categoryDistribution,
+        labels: ['Football', 'Basketball', 'Tennis', 'Other'],
         datasets: [{
-          ...chartData.categoryDistribution.datasets[0],
           data: categories,
+          backgroundColor: [
+            'rgba(255, 99, 132, 0.5)',
+            'rgba(54, 162, 235, 0.5)',
+            'rgba(255, 206, 86, 0.5)',
+            'rgba(75, 192, 192, 0.5)',
+          ],
         }],
       },
       priceTrend: {
         labels,
         datasets: [{
-          ...chartData.priceTrend.datasets[0],
+          label: 'Average Price',
           data: priceTrend,
+          borderColor: 'rgb(75, 192, 192)',
+          tension: 0.1,
         }],
       },
-    });
+    };
   }, [equipment]);
 
   return (
@@ -155,6 +104,9 @@ export default function EquipmentCharts({ equipment }: EquipmentChartsProps) {
                 position: 'top' as const,
               },
             },
+            animation: {
+              duration: 500
+            }
           }}
         />
       </div>
@@ -169,6 +121,9 @@ export default function EquipmentCharts({ equipment }: EquipmentChartsProps) {
                 position: 'top' as const,
               },
             },
+            animation: {
+              duration: 500
+            }
           }}
         />
       </div>
@@ -183,6 +138,9 @@ export default function EquipmentCharts({ equipment }: EquipmentChartsProps) {
                 position: 'top' as const,
               },
             },
+            animation: {
+              duration: 500
+            }
           }}
         />
       </div>

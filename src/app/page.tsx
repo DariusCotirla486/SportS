@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { SportEquipment } from '@/lib/db';
 import EquipmentList from '@/components/EquipmentList';
 import EquipmentForm from '@/components/EquipmentForm';
@@ -13,18 +13,19 @@ export default function Home() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [equipment, setEquipment] = useState<SportEquipment[]>([]);
 
-  useEffect(() => {
-    const fetchEquipment = async () => {
-      try {
-        const response = await fetch('/api/equipment');
-        const data = await response.json();
-        setEquipment(data);
-      } catch (error) {
-        console.error('Error fetching equipment:', error);
-      }
-    };
-    fetchEquipment();
+  const fetchEquipment = useCallback(async () => {
+    try {
+      const response = await fetch('/api/equipment');
+      const data = await response.json();
+      setEquipment(data);
+    } catch (error) {
+      console.error('Error fetching equipment:', error);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchEquipment();
+  }, [fetchEquipment]);
 
   const handleAddEquipment = async (newEquipment: SportEquipment) => {
     try {
@@ -38,13 +39,16 @@ export default function Home() {
       if (!response.ok) {
         throw new Error('Failed to add equipment');
       }
-      const addedEquipment = await response.json();
-      setEquipment(prev => [...prev, addedEquipment]);
+      await fetchEquipment();
       setShowAddForm(false);
     } catch (error) {
       console.error('Error adding equipment:', error);
     }
   };
+
+  const handleEquipmentUpdate = useCallback(() => {
+    fetchEquipment();
+  }, [fetchEquipment]);
 
   return (
     <main className="min-h-screen bg-gray-100">
@@ -68,7 +72,11 @@ export default function Home() {
           priceSort={priceSort}
         />
 
-        <EquipmentList activeCategory={activeCategory} priceSort={priceSort} />
+        <EquipmentList 
+          activeCategory={activeCategory} 
+          priceSort={priceSort} 
+          onDataChange={handleEquipmentUpdate}
+        />
 
         {showAddForm && (
           <EquipmentForm

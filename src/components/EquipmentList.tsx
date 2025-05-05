@@ -8,27 +8,43 @@ import EquipmentForm from './EquipmentForm';
 interface EquipmentListProps {
   activeCategory: string;
   priceSort: 'none' | 'high-low' | 'low-high';
+  onDataChange?: () => void;
 }
 
-export default function EquipmentList({ activeCategory, priceSort }: EquipmentListProps) {
+export default function EquipmentList({ activeCategory, priceSort, onDataChange }: EquipmentListProps) {
   const [equipment, setEquipment] = useState<SportEquipment[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [editingEquipment, setEditingEquipment] = useState<SportEquipment | null>(null);
+  const [editingEquipment, setEditingEquipment] = useState<SportEquipment | undefined>(undefined);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const itemsPerPage = 8;
 
-  // Fetch equipment data
-  useEffect(() => {
-    const fetchEquipment = async () => {
-      try {
-        const response = await fetch('/api/equipment');
-        const data = await response.json();
-        setEquipment(data);
-      } catch (error) {
-        console.error('Error fetching equipment:', error);
+  // Fetch equipment data with filters
+  const fetchEquipment = async () => {
+    try {
+      const response = await fetch(`/api/equipment/filter?category=${activeCategory}&sort=${priceSort}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch equipment');
       }
-    };
+      const data = await response.json();
+      setEquipment(data);
+      // Reset to first page when filters change
+      setCurrentPage(1);
+    } catch (error) {
+      console.error('Error fetching equipment:', error);
+    }
+  };
+
+  // Effect to fetch data when filters change
+  useEffect(() => {
     fetchEquipment();
-  }, []);
+  }, [activeCategory, priceSort]);
+
+  // Effect to trigger chart update when equipment data changes
+  useEffect(() => {
+    if (onDataChange) {
+      onDataChange();
+    }
+  }, [equipment, onDataChange]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -38,7 +54,8 @@ export default function EquipmentList({ activeCategory, priceSort }: EquipmentLi
       if (!response.ok) {
         throw new Error('Failed to delete equipment');
       }
-      setEquipment(prevEquipment => prevEquipment.filter(item => item.id !== id));
+      // Re-fetch the filtered list after deletion
+      await fetchEquipment();
     } catch (error) {
       console.error('Error deleting equipment:', error);
     }
@@ -60,56 +77,75 @@ export default function EquipmentList({ activeCategory, priceSort }: EquipmentLi
       if (!response.ok) {
         throw new Error('Failed to update equipment');
       }
-      setEquipment(prevEquipment => 
-        prevEquipment.map(item => 
-          item.id === updatedEquipment.id ? updatedEquipment : item
-        )
-      );
-      setEditingEquipment(null);
+      // Re-fetch the filtered list after update
+      await fetchEquipment();
+      setEditingEquipment(undefined);
     } catch (error) {
       console.error('Error updating equipment:', error);
     }
   };
 
-  // Helper function to determine if an item belongs to a category
-  const belongsToCategory = (item: SportEquipment, category: string): boolean => {
-    if (category === 'All') {
-      return true;
-    }
-    return item.category === category;
+  const handleAddNew = () => {
+    setIsFormOpen(true);
   };
 
-  // Filter equipment by category
-  const filteredEquipment = equipment.filter(item => belongsToCategory(item, activeCategory));
+  const handleFormClose = () => {
+    setIsFormOpen(false);
+    setEditingEquipment(undefined);
+  };
 
-  // Sort equipment by price
-  const sortedEquipment = [...filteredEquipment].sort((a, b) => {
-    if (priceSort === 'high-low') {
-      return b.price - a.price;
-    } else if (priceSort === 'low-high') {
-      return a.price - b.price;
+  const handleFormSubmit = async (newEquipment: SportEquipment) => {
+    try {
+      const response = await fetch('/api/equipment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newEquipment)
+      });
+      if (!response.ok) {
+        throw new Error('Failed to add equipment');
+      }
+      // Re-fetch the filtered list after adding new equipment
+      await fetchEquipment();
+      handleFormClose();
+    } catch (error) {
+      console.error('Error adding equipment:', error);
     }
-    return 0;
-  });
+  };
+
+  // If form is open, only show the form
+  if (isFormOpen || editingEquipment) {
+    return (
+      <div className="fixed inset-0 bg-white z-50">
+        <EquipmentForm
+          onClose={handleFormClose}
+          equipment={editingEquipment}
+          onUpdate={handleFormSubmit}
+        />
+      </div>
+    );
+  }
 
   // Calculate pagination
-  const totalPages = Math.ceil(sortedEquipment.length / itemsPerPage);
+  const totalPages = Math.ceil(equipment.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedEquipment = sortedEquipment.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedEquipment = equipment.slice(startIndex, startIndex + itemsPerPage);
 
   return (
     <div className="space-y-6">
-      {editingEquipment && (
-        <EquipmentForm
-          onClose={() => setEditingEquipment(null)}
-          equipment={editingEquipment}
-          onUpdate={handleUpdate}
-        />
-      )}
+      <div className="flex justify-end">
+        <button
+          onClick={handleAddNew}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Add New Equipment
+        </button>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {paginatedEquipment.map((item) => (
-          <div key={item.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div key={`${item.id}-${item.name}`} className="bg-white rounded-lg shadow-md overflow-hidden">
             <div className="relative h-48">
               <Image
                 src={item.imageUrl}
