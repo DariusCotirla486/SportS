@@ -96,21 +96,27 @@ export default function EquipmentList({ activeCategory, priceSort, onDataChange 
 
   const handleFormSubmit = async (newEquipment: SportEquipment) => {
     try {
-      const response = await fetch('/api/equipment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(newEquipment)
-      });
-      if (!response.ok) {
-        throw new Error('Failed to add equipment');
+      if (editingEquipment) {
+        // Handle update
+        await handleUpdate(newEquipment);
+      } else {
+        // Handle add
+        const response = await fetch('/api/equipment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(newEquipment)
+        });
+        if (!response.ok) {
+          throw new Error('Failed to add equipment');
+        }
+        // Re-fetch the filtered list after adding
+        await fetchEquipment();
       }
-      // Re-fetch the filtered list after adding new equipment
-      await fetchEquipment();
       handleFormClose();
     } catch (error) {
-      console.error('Error adding equipment:', error);
+      console.error('Error handling equipment:', error);
     }
   };
 

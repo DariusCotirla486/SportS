@@ -10,6 +10,33 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const newEquipment = await request.json();
+    
+    // Validate required fields
+    const requiredFields = ['name', 'category', 'price', 'brand', 'inStock', 'description', 'condition', 'imageUrl'];
+    const missingFields = requiredFields.filter(field => !(field in newEquipment));
+    
+    if (missingFields.length > 0) {
+      return NextResponse.json(
+        { error: `Missing required fields: ${missingFields.join(', ')}` },
+        { status: 500 }
+      );
+    }
+
+    // Validate price and stock values
+    if (newEquipment.price < 0) {
+      return NextResponse.json(
+        { error: 'Price cannot be negative' },
+        { status: 500 }
+      );
+    }
+
+    if (newEquipment.inStock < 0 || !Number.isInteger(newEquipment.inStock)) {
+      return NextResponse.json(
+        { error: 'Stock must be a non-negative integer' },
+        { status: 500 }
+      );
+    }
+
     // Generate a simple numeric ID that continues from the last item
     const id = (equipment.length + 1).toString();
     const equipmentWithId: SportEquipment = { ...newEquipment, id };

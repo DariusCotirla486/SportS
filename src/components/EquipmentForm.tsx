@@ -52,25 +52,11 @@ export default function EquipmentForm({ onClose, equipment, onUpdate }: Equipmen
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const method = equipment ? 'PATCH' : 'POST';
-      const url = equipment 
-        ? `/api/equipment?id=${equipment.id}`
-        : '/api/equipment';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save equipment');
-      }
-
       if (onUpdate) {
-        onUpdate(formData as SportEquipment);
+        const equipmentData = equipment 
+          ? formData 
+          : { ...formData, id: Date.now().toString() };
+        onUpdate(equipmentData as SportEquipment);
       }
       onClose();
     } catch (error) {
