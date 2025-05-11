@@ -1,3 +1,5 @@
+'use client';
+
 import { useConnectionStatus } from '@/hooks/useConnectionStatus';
 
 export function ConnectionStatus() {

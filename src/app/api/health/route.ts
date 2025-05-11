@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  return NextResponse.json({ status: 'ok' }, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  return NextResponse.json(
+    { status: 'ok' },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
 } 

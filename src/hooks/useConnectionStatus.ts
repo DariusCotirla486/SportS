@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 
 interface ConnectionStatus {
@@ -13,18 +15,55 @@ export function useConnectionStatus() {
 
   useEffect(() => {
     const checkServerStatus = async () => {
+      // If we're offline, don't even try to check server status
+      if (!navigator.onLine) {
+        setStatus(prev => ({
+          ...prev,
+          isOnline: false,
+          isServerAvailable: false
+        }));
+        return;
+      }
+
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
         const response = await fetch('/api/health', {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
           },
+          signal: controller.signal,
+          // Add cache: 'no-store' to prevent caching of the health check
+          cache: 'no-store'
         });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          console.warn('Server health check failed:', response.status);
+          setStatus(prev => ({
+            ...prev,
+            isServerAvailable: false
+          }));
+          return;
+        }
+
+        const data = await response.json();
         setStatus(prev => ({
           ...prev,
-          isServerAvailable: response.ok
+          isOnline: true,
+          isServerAvailable: data.status === 'ok'
         }));
-      } catch {
+      } catch (error) {
+        // Handle network errors and server unavailability
+        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+          console.warn('Server is unavailable');
+        } else {
+          console.warn('Server health check error:', error);
+        }
+        
         setStatus(prev => ({
           ...prev,
           isServerAvailable: false
@@ -34,11 +73,16 @@ export function useConnectionStatus() {
 
     const handleOnline = () => {
       setStatus(prev => ({ ...prev, isOnline: true }));
+      // Check server status when coming back online
       checkServerStatus();
     };
 
     const handleOffline = () => {
-      setStatus(prev => ({ ...prev, isOnline: false }));
+      setStatus(prev => ({ 
+        ...prev, 
+        isOnline: false,
+        isServerAvailable: false // Server is considered unavailable when offline
+      }));
     };
 
     // Initial check
@@ -49,7 +93,7 @@ export function useConnectionStatus() {
     window.addEventListener('offline', handleOffline);
 
     // Set up periodic server check
-    const interval = setInterval(checkServerStatus, 30000); // Check every 30 seconds
+    const interval = setInterval(checkServerStatus, 10000); // Check every 10 seconds
 
     return () => {
       window.removeEventListener('online', handleOnline);
