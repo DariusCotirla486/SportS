@@ -2,7 +2,7 @@
 
 import { SportEquipment } from '@/lib/db';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import EquipmentForm from './EquipmentForm';
 import { useEquipment } from '@/hooks/useEquipment';
 import { useConnectionStatus } from '@/hooks/useConnectionStatus';
@@ -13,12 +13,13 @@ interface EquipmentListProps {
 }
 
 export default function EquipmentList({ activeCategory, priceSort }: EquipmentListProps) {
-  const [currentPage, setCurrentPage] = useState(1);
   const [editingEquipment, setEditingEquipment] = useState<SportEquipment | undefined>(undefined);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const itemsPerPage = 8;
   const { equipment, loading, error, deleteEquipment, updateEquipment, addEquipment } = useEquipment();
   const { isOnline, isServerAvailable } = useConnectionStatus();
+  const [page, setPage] = useState(1);
+  const loadingRef = useRef<HTMLDivElement>(null);
 
   // Filter and sort equipment
   const filteredAndSortedEquipment = equipment
@@ -28,6 +29,41 @@ export default function EquipmentList({ activeCategory, priceSort }: EquipmentLi
       if (priceSort === 'low-high') return a.price - b.price;
       return 0;
     });
+
+  // Calculate displayed items based on current page
+  const displayedItems = filteredAndSortedEquipment.slice(0, page * itemsPerPage);
+  const hasMore = displayedItems.length < filteredAndSortedEquipment.length;
+
+  // Set up intersection observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loading && hasMore) {
+          setPage(prev => prev + 1);
+        }
+      },
+      {
+        root: null,
+        rootMargin: '100px',
+        threshold: 0.1,
+      }
+    );
+
+    if (loadingRef.current) {
+      observer.observe(loadingRef.current);
+    }
+
+    return () => {
+      if (loadingRef.current) {
+        observer.unobserve(loadingRef.current);
+      }
+    };
+  }, [loading, hasMore]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [activeCategory, priceSort]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -72,21 +108,8 @@ export default function EquipmentList({ activeCategory, priceSort }: EquipmentLi
     }
   };
 
-  // If form is open, only show the form
-  if (isFormOpen || editingEquipment) {
-    return (
-      <div className="fixed inset-0 bg-white z-50">
-        <EquipmentForm
-          onClose={handleFormClose}
-          equipment={editingEquipment}
-          onUpdate={handleFormSubmit}
-        />
-      </div>
-    );
-  }
-
   // Show loading state
-  if (loading) {
+  if (loading && displayedItems.length === 0) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="text-lg text-gray-600">Loading equipment...</div>
@@ -103,10 +126,18 @@ export default function EquipmentList({ activeCategory, priceSort }: EquipmentLi
     );
   }
 
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredAndSortedEquipment.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedEquipment = filteredAndSortedEquipment.slice(startIndex, startIndex + itemsPerPage);
+  // If form is open, only show the form
+  if (isFormOpen || editingEquipment) {
+    return (
+      <div className="fixed inset-0 bg-white z-50">
+        <EquipmentForm
+          onClose={handleFormClose}
+          equipment={editingEquipment}
+          onUpdate={handleFormSubmit}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -125,7 +156,7 @@ export default function EquipmentList({ activeCategory, priceSort }: EquipmentLi
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {paginatedEquipment.map((item) => (
+        {displayedItems.map((item) => (
           <div key={`${item.id}-${item.name}`} className="bg-white rounded-lg shadow-md overflow-hidden">
             <div className="relative h-48">
               <Image
@@ -159,27 +190,21 @@ export default function EquipmentList({ activeCategory, priceSort }: EquipmentLi
         ))}
       </div>
 
-      <div className="flex justify-center space-x-4 mt-8 bg-white p-4 rounded-lg shadow-md">
-        <button
-          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-          disabled={currentPage === 1}
-          className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          Previous
-        </button>
-        <div className="flex items-center space-x-2">
-          <span className="text-gray-700">Page</span>
-          <span className="font-semibold text-blue-600">{currentPage}</span>
-          <span className="text-gray-700">of</span>
-          <span className="font-semibold text-blue-600">{totalPages}</span>
-        </div>
-        <button
-          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-          disabled={currentPage === totalPages}
-          className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          Next
-        </button>
+      {/* Loading trigger element */}
+      <div
+        ref={loadingRef}
+        className="h-20 flex items-center justify-center"
+      >
+        {loading && (
+          <div className="text-gray-500">
+            Loading more items...
+          </div>
+        )}
+        {!loading && !hasMore && displayedItems.length > 0 && (
+          <div className="text-gray-500">
+            No more items to load
+          </div>
+        )}
       </div>
     </div>
   );
