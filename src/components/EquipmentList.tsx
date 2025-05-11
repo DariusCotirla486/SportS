@@ -2,60 +2,36 @@
 
 import { SportEquipment } from '@/lib/db';
 import Image from 'next/image';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import EquipmentForm from './EquipmentForm';
+import { useEquipment } from '@/hooks/useEquipment';
+import { useConnectionStatus } from '@/hooks/useConnectionStatus';
 
 interface EquipmentListProps {
   activeCategory: string;
   priceSort: 'none' | 'high-low' | 'low-high';
-  onDataChange?: () => void;
 }
 
-export default function EquipmentList({ activeCategory, priceSort, onDataChange }: EquipmentListProps) {
-  const [equipment, setEquipment] = useState<SportEquipment[]>([]);
+export default function EquipmentList({ activeCategory, priceSort }: EquipmentListProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [editingEquipment, setEditingEquipment] = useState<SportEquipment | undefined>(undefined);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const itemsPerPage = 8;
+  const { equipment, loading, error, deleteEquipment, updateEquipment, addEquipment } = useEquipment();
+  const { isOnline, isServerAvailable } = useConnectionStatus();
 
-  // Fetch equipment data with filters
-  const fetchEquipment = async () => {
-    try {
-      const response = await fetch(`/api/equipment/filter?category=${activeCategory}&sort=${priceSort}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch equipment');
-      }
-      const data = await response.json();
-      setEquipment(data);
-      // Reset to first page when filters change
-      setCurrentPage(1);
-    } catch (error) {
-      console.error('Error fetching equipment:', error);
-    }
-  };
-
-  // Effect to fetch data when filters change
-  useEffect(() => {
-    fetchEquipment();
-  }, [activeCategory, priceSort]);
-
-  // Effect to trigger chart update when equipment data changes
-  useEffect(() => {
-    if (onDataChange) {
-      onDataChange();
-    }
-  }, [equipment, onDataChange]);
+  // Filter and sort equipment
+  const filteredAndSortedEquipment = equipment
+    .filter(item => activeCategory === 'All' || item.category === activeCategory)
+    .sort((a, b) => {
+      if (priceSort === 'high-low') return b.price - a.price;
+      if (priceSort === 'low-high') return a.price - b.price;
+      return 0;
+    });
 
   const handleDelete = async (id: string) => {
     try {
-      const response = await fetch(`/api/equipment?id=${id}`, {
-        method: 'DELETE'
-      });
-      if (!response.ok) {
-        throw new Error('Failed to delete equipment');
-      }
-      // Re-fetch the filtered list after deletion
-      await fetchEquipment();
+      await deleteEquipment(id);
     } catch (error) {
       console.error('Error deleting equipment:', error);
     }
@@ -67,18 +43,7 @@ export default function EquipmentList({ activeCategory, priceSort, onDataChange 
 
   const handleUpdate = async (updatedEquipment: SportEquipment) => {
     try {
-      const response = await fetch(`/api/equipment?id=${updatedEquipment.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(updatedEquipment)
-      });
-      if (!response.ok) {
-        throw new Error('Failed to update equipment');
-      }
-      // Re-fetch the filtered list after update
-      await fetchEquipment();
+      await updateEquipment(updatedEquipment.id, updatedEquipment);
       setEditingEquipment(undefined);
     } catch (error) {
       console.error('Error updating equipment:', error);
@@ -97,22 +62,9 @@ export default function EquipmentList({ activeCategory, priceSort, onDataChange 
   const handleFormSubmit = async (newEquipment: SportEquipment) => {
     try {
       if (editingEquipment) {
-        // Handle update
         await handleUpdate(newEquipment);
       } else {
-        // Handle add
-        const response = await fetch('/api/equipment', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(newEquipment)
-        });
-        if (!response.ok) {
-          throw new Error('Failed to add equipment');
-        }
-        // Re-fetch the filtered list after adding
-        await fetchEquipment();
+        await addEquipment(newEquipment);
       }
       handleFormClose();
     } catch (error) {
@@ -133,14 +85,37 @@ export default function EquipmentList({ activeCategory, priceSort, onDataChange 
     );
   }
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-lg text-gray-600">Loading equipment...</div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-lg text-red-600">Error: {error}</div>
+      </div>
+    );
+  }
+
   // Calculate pagination
-  const totalPages = Math.ceil(equipment.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredAndSortedEquipment.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedEquipment = equipment.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedEquipment = filteredAndSortedEquipment.slice(startIndex, startIndex + itemsPerPage);
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center">
+        <div className="text-sm text-gray-600">
+          {!isOnline && (
+            <span className="text-yellow-600 font-medium">⚠️ Working offline - Changes will sync when online</span>
+          )}
+        </div>
         <button
           onClick={handleAddNew}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
