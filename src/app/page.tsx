@@ -31,7 +31,7 @@ export default function Home() {
         <EquipmentList 
           activeCategory={activeCategory} 
           priceSort={priceSort} 
-        />
+          />
       </div>
     </main>
   );

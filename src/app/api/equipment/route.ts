@@ -1,11 +1,11 @@
-import { NextResponse } from 'next/server';
-import { equipment, SportEquipment } from '@/lib/db';
+import { NextRequest, NextResponse } from 'next/server';
+import { getConnection } from '@/lib/db';
 
 // Helper function to add CORS headers
 function corsHeaders() {
   return {
-    'Access-Control-Allow-Origin': '*', // Or specify your frontend domain
-    'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Accept',
   };
 }
@@ -20,157 +20,145 @@ export async function OPTIONS() {
 
 // GET all equipment
 export async function GET() {
-  return NextResponse.json(equipment, {
-    headers: corsHeaders(),
-  });
-}
-
-// POST new equipment
-export async function POST(request: Request) {
   try {
-    const newEquipment = await request.json();
-    
-    // Validate required fields
-    const requiredFields = ['name', 'category', 'price', 'brand', 'inStock', 'description', 'condition', 'imageUrl'];
-    const missingFields = requiredFields.filter(field => !(field in newEquipment));
-    
-    if (missingFields.length > 0) {
-      return NextResponse.json(
-        { error: `Missing required fields: ${missingFields.join(', ')}` },
-        { 
-          status: 500,
-          headers: corsHeaders(),
-        }
-      );
-    }
-
-    // Validate price and stock values
-    if (newEquipment.price < 0) {
-      return NextResponse.json(
-        { error: 'Price cannot be negative' },
-        { 
-          status: 500,
-          headers: corsHeaders(),
-        }
-      );
-    }
-
-    if (newEquipment.inStock < 0 || !Number.isInteger(newEquipment.inStock)) {
-      return NextResponse.json(
-        { error: 'Stock must be a non-negative integer' },
-        { 
-          status: 500,
-          headers: corsHeaders(),
-        }
-      );
-    }
-
-    // Generate a simple numeric ID that continues from the last item
-    const id = (equipment.length + 1).toString();
-    const equipmentWithId: SportEquipment = { ...newEquipment, id };
-    equipment.push(equipmentWithId);
-    return NextResponse.json(equipmentWithId, { 
-      status: 201,
-      headers: corsHeaders(),
-    });
+    const pool = await getConnection();
+    const result = await pool.query('SELECT * FROM get_all_items()');
+    return NextResponse.json(result.rows, { headers: corsHeaders() });
   } catch (error) {
+    console.error('Error fetching items:', error);
     return NextResponse.json(
-      { error: 'Failed to add equipment' }, 
-      { 
-        status: 500,
-        headers: corsHeaders(),
-      }
+      { error: 'Failed to fetch items' },
+      { status: 500, headers: corsHeaders() }
     );
   }
 }
 
-// PATCH (update) equipment by ID
-export async function PATCH(request: Request) {
+// POST new equipment
+export async function POST(request: NextRequest) {
+  try {
+    const data = await request.json();
+    
+    // Validate required fields
+    const requiredFields = ['name', 'brand', 'category_id', 'price', 'condition'];
+    const missingFields = requiredFields.filter(field => !data[field]);
+    
+    if (missingFields.length > 0) {
+      return NextResponse.json(
+        { error: `Missing required fields: ${missingFields.join(', ')}` },
+        { status: 400, headers: corsHeaders() }
+      );
+    }
+
+    const pool = await getConnection();
+    const result = await pool.query(
+      'SELECT add_item($1, $2, $3, $4, $5, $6, $7) as id',
+      [
+        data.name,
+        data.brand,
+        data.category_id,
+        data.price,
+        data.description,
+        data.condition,
+        data.image_filename
+      ]
+    );
+
+    return NextResponse.json(
+      { id: result.rows[0].id },
+      { status: 201, headers: corsHeaders() }
+    );
+  } catch (error) {
+    console.error('Error creating item:', error);
+    return NextResponse.json(
+      { error: 'Failed to create item' },
+      { status: 500, headers: corsHeaders() }
+    );
+  }
+}
+
+// PUT (update) equipment by ID
+export async function PUT(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    
     if (!id) {
       return NextResponse.json(
-        { error: 'ID is required' }, 
-        { 
-          status: 400,
-          headers: corsHeaders(),
-        }
+        { error: 'ID is required (query parameter)' },
+        { status: 400, headers: corsHeaders() }
       );
     }
+    const updateData = await request.json();
 
-    const updatedData = await request.json();
-    const index = equipment.findIndex((item: SportEquipment) => String(item.id) === String(id));
-    
-    if (index === -1) {
+    const pool = await getConnection();
+    const result = await pool.query(
+      'SELECT update_item($1, $2, $3, $4, $5, $6, $7, $8) as success',
+      [
+        id,
+        updateData.name,
+        updateData.brand,
+        updateData.category_id,
+        updateData.price,
+        updateData.description,
+        updateData.condition,
+        updateData.image_filename
+      ]
+    );
+
+    if (!result.rows[0].success) {
       return NextResponse.json(
-        { error: 'Equipment not found' }, 
-        { 
-          status: 404,
-          headers: corsHeaders(),
-        }
+        { error: 'Item not found' },
+        { status: 404, headers: corsHeaders() }
       );
     }
 
-    const updatedEquipment: SportEquipment = { ...equipment[index], ...updatedData, id: equipment[index].id };
-    equipment[index] = updatedEquipment;
-    return NextResponse.json(updatedEquipment, {
-      headers: corsHeaders(),
-    });
-  } catch (error) {
     return NextResponse.json(
-      { error: 'Failed to update equipment' }, 
-      { 
-        status: 500,
-        headers: corsHeaders(),
-      }
+      { success: true },
+      { headers: corsHeaders() }
+    );
+  } catch (error) {
+    console.error('Error updating item:', error);
+    return NextResponse.json(
+      { error: 'Failed to update item' },
+      { status: 500, headers: corsHeaders() }
     );
   }
 }
 
 // DELETE equipment by ID
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     
     if (!id) {
       return NextResponse.json(
-        { error: 'ID is required' }, 
-        { 
-          status: 400,
-          headers: corsHeaders(),
-        }
+        { error: 'ID is required' },
+        { status: 400, headers: corsHeaders() }
       );
     }
 
-    const index = equipment.findIndex((item: SportEquipment) => String(item.id) === String(id));
-    
-    if (index === -1) {
+    const pool = await getConnection();
+    const result = await pool.query(
+      'SELECT delete_item($1) as success',
+      [id]
+    );
+
+    if (!result.rows[0].success) {
       return NextResponse.json(
-        { error: 'Equipment not found' }, 
-        { 
-          status: 404,
-          headers: corsHeaders(),
-        }
+        { error: 'Item not found' },
+        { status: 404, headers: corsHeaders() }
       );
     }
 
-    equipment.splice(index, 1);
     return NextResponse.json(
       { success: true },
-      {
-        headers: corsHeaders(),
-      }
+      { headers: corsHeaders() }
     );
   } catch (error) {
+    console.error('Error deleting item:', error);
     return NextResponse.json(
-      { error: 'Failed to delete equipment' }, 
-      { 
-        status: 500,
-        headers: corsHeaders(),
-      }
+      { error: 'Failed to delete item' },
+      { status: 500, headers: corsHeaders() }
     );
   }
 } 
