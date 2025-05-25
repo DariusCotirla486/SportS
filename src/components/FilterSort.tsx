@@ -1,36 +1,51 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { SportEquipment } from '@/types/types';
+import { Category } from '@/types/types';
 
 interface FilterSortProps {
-  onCategoryChange: (category: string) => void;
+  onCategoryChange: (categoryId: string | null) => void;
   onPriceSortChange: (sort: 'none' | 'high-low' | 'low-high') => void;
-  activeCategory: string;
+  activeCategoryId: string | null;
   priceSort: 'none' | 'high-low' | 'low-high';
 }
 
 export default function FilterSort({
   onCategoryChange,
   onPriceSortChange,
-  activeCategory,
+  activeCategoryId,
   priceSort
 }: FilterSortProps) {
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('/api/equipment');
-        const data = await response.json() as SportEquipment[];
-        const uniqueCategories = Array.from(new Set(data.map((item) => item.category_name)));
-        setCategories(uniqueCategories);
+        const response = await fetch('/api/categories');
+        if (!response.ok) {
+          throw new Error('Failed to fetch categories');
+        }
+        const data = await response.json();
+        setCategories(data);
       } catch (error) {
         console.error('Error fetching categories:', error);
+        setError('Failed to load categories');
+      } finally {
+        setLoading(false);
       }
     };
     fetchCategories();
   }, []);
+
+  if (loading) {
+    return <div className="animate-pulse bg-gray-200 h-12 rounded-lg"></div>;
+  }
+
+  if (error) {
+    return <div className="text-red-600">{error}</div>;
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-8">
@@ -40,14 +55,14 @@ export default function FilterSort({
             Category
           </label>
           <select
-            value={activeCategory}
-            onChange={(e) => onCategoryChange(e.target.value)}
+            value={activeCategoryId || ''}
+            onChange={(e) => onCategoryChange(e.target.value || null)}
             className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900"
           >
-            <option value="All">All Categories</option>
+            <option value="">All Categories</option>
             {categories.map((category) => (
-              <option key={category} value={category}>
-                {category}
+              <option key={category.id} value={category.id}>
+                {category.name}
               </option>
             ))}
           </select>
@@ -61,7 +76,7 @@ export default function FilterSort({
             onChange={(e) => onPriceSortChange(e.target.value as 'none' | 'high-low' | 'low-high')}
             className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900"
           >
-            <option value="none">No Sort</option>
+            <option value="none">No Sorting</option>
             <option value="high-low">Price: High to Low</option>
             <option value="low-high">Price: Low to High</option>
           </select>
