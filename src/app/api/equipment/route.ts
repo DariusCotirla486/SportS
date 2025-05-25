@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getConnection } from '@/lib/db';
+import { verify } from 'jsonwebtoken';
 
-// Helper function to add CORS headers
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// Add CORS headers
 function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
@@ -18,11 +21,29 @@ export async function OPTIONS() {
   });
 }
 
-// GET all equipment
-export async function GET() {
+// GET - Fetch items for specific user
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const user_id = searchParams.get('user_id');
+    
+    if (!user_id) {
+      return NextResponse.json(
+        { error: 'User ID is required' },
+        { status: 400, headers: corsHeaders() }
+      );
+    }
+
     const pool = await getConnection();
-    const result = await pool.query('SELECT * FROM get_all_items()');
+    const result = await pool.query(`
+      SELECT i.*, c.name as category_name, s.quantity
+      FROM items i
+      LEFT JOIN item_categories c ON i.category_id = c.id
+      LEFT JOIN item_stock s ON i.id = s.item_id
+      WHERE i.user_id = $1
+      ORDER BY i.created_at DESC
+    `, [user_id]);
+    
     return NextResponse.json(result.rows, { headers: corsHeaders() });
   } catch (error) {
     console.error('Error fetching items:', error);
@@ -33,88 +54,118 @@ export async function GET() {
   }
 }
 
-// POST new equipment
+// POST - Add new item (user_id from body)
 export async function POST(request: NextRequest) {
   try {
-    const data = await request.json();
-    
-    // Validate required fields
-    const requiredFields = ['name', 'brand', 'category_id', 'price', 'condition'];
-    const missingFields = requiredFields.filter(field => !data[field]);
-    
-    if (missingFields.length > 0) {
+    const item = await request.json();
+    const user_id = item.user_id;
+    if (!user_id) {
       return NextResponse.json(
-        { error: `Missing required fields: ${missingFields.join(', ')}` },
+        { error: 'Missing user_id' },
         { status: 400, headers: corsHeaders() }
       );
     }
-
     const pool = await getConnection();
+    // Insert into items with user_id from body
     const result = await pool.query(
-      'SELECT add_item($1, $2, $3, $4, $5, $6, $7) as id',
+      `INSERT INTO items (
+        name, brand, category_id, price, description, 
+        condition, image_filename, user_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *`,
       [
-        data.name,
-        data.brand,
-        data.category_id,
-        data.price,
-        data.description,
-        data.condition,
-        data.image_filename
+        item.name,
+        item.brand,
+        item.category_id,
+        item.price,
+        item.description,
+        item.condition,
+        item.image_filename,
+        user_id
       ]
     );
-
-    return NextResponse.json(
-      { id: result.rows[0].id },
-      { status: 201, headers: corsHeaders() }
+    if (item.quantity !== undefined) {
+      await pool.query(
+        `INSERT INTO item_stock (item_id, quantity) VALUES ($1, $2)
+         ON CONFLICT (item_id) DO UPDATE SET quantity = EXCLUDED.quantity`,
+        [result.rows[0].id, item.quantity]
+      );
+    }
+    const fullItem = await pool.query(
+      `SELECT i.*, c.name as category_name, s.quantity
+       FROM items i
+       LEFT JOIN item_categories c ON i.category_id = c.id
+       LEFT JOIN item_stock s ON i.id = s.item_id
+       WHERE i.id = $1`,
+      [result.rows[0].id]
     );
+    return NextResponse.json(fullItem.rows[0], { headers: corsHeaders() });
   } catch (error) {
-    console.error('Error creating item:', error);
+    console.error('Error adding item:', error);
     return NextResponse.json(
-      { error: 'Failed to create item' },
+      { error: 'Failed to add item' },
       { status: 500, headers: corsHeaders() }
     );
   }
 }
 
-// PUT (update) equipment by ID
+// PUT - Update item (user_id from body, must match item's user_id)
 export async function PUT(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-    if (!id) {
+    const { id, user_id, ...updates } = await request.json();
+    if (!user_id) {
       return NextResponse.json(
-        { error: 'ID is required (query parameter)' },
+        { error: 'Missing user_id' },
         { status: 400, headers: corsHeaders() }
       );
     }
-    const updateData = await request.json();
-
     const pool = await getConnection();
-    const result = await pool.query(
-      'SELECT update_item($1, $2, $3, $4, $5, $6, $7, $8) as success',
-      [
-        id,
-        updateData.name,
-        updateData.brand,
-        updateData.category_id,
-        updateData.price,
-        updateData.description,
-        updateData.condition,
-        updateData.image_filename
-      ]
+    // Check ownership
+    const checkResult = await pool.query(
+      'SELECT id FROM items WHERE id = $1 AND user_id = $2',
+      [id, user_id]
     );
-
-    if (!result.rows[0].success) {
+    if (checkResult.rows.length === 0) {
       return NextResponse.json(
-        { error: 'Item not found' },
+        { error: 'Item not found or unauthorized' },
         { status: 404, headers: corsHeaders() }
       );
     }
-
-    return NextResponse.json(
-      { success: true },
-      { headers: corsHeaders() }
+    // Update the item
+    await pool.query(
+      `UPDATE items 
+       SET name = $1, brand = $2, category_id = $3, 
+           price = $4, description = $5, condition = $6, 
+           image_filename = $7, updated_at = NOW()
+       WHERE id = $8 AND user_id = $9`,
+      [
+        updates.name,
+        updates.brand,
+        updates.category_id,
+        updates.price,
+        updates.description,
+        updates.condition,
+        updates.image_filename,
+        id,
+        user_id
+      ]
     );
+    if (updates.quantity !== undefined) {
+      await pool.query(
+        `INSERT INTO item_stock (item_id, quantity) VALUES ($1, $2)
+         ON CONFLICT (item_id) DO UPDATE SET quantity = EXCLUDED.quantity`,
+        [id, updates.quantity]
+      );
+    }
+    const fullItem = await pool.query(
+      `SELECT i.*, c.name as category_name, s.quantity
+       FROM items i
+       LEFT JOIN item_categories c ON i.category_id = c.id
+       LEFT JOIN item_stock s ON i.id = s.item_id
+       WHERE i.id = $1`,
+      [id]
+    );
+    return NextResponse.json(fullItem.rows[0], { headers: corsHeaders() });
   } catch (error) {
     console.error('Error updating item:', error);
     return NextResponse.json(
@@ -124,34 +175,36 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE equipment by ID
+// DELETE - Remove item (user_id from query, must match item's user_id)
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    
-    if (!id) {
+    const user_id = searchParams.get('user_id');
+    if (!id || !user_id) {
       return NextResponse.json(
-        { error: 'ID is required' },
+        { error: 'Item ID and user_id are required' },
         { status: 400, headers: corsHeaders() }
       );
     }
-
     const pool = await getConnection();
-    const result = await pool.query(
-      'SELECT delete_item($1) as success',
-      [id]
+    // Check ownership
+    const checkResult = await pool.query(
+      'SELECT id FROM items WHERE id = $1 AND user_id = $2',
+      [id, user_id]
     );
-
-    if (!result.rows[0].success) {
+    if (checkResult.rows.length === 0) {
       return NextResponse.json(
-        { error: 'Item not found' },
+        { error: 'Item not found or unauthorized' },
         { status: 404, headers: corsHeaders() }
       );
     }
-
+    // Delete from item_stock first (if exists)
+    await pool.query('DELETE FROM item_stock WHERE item_id = $1', [id]);
+    // Delete the item
+    await pool.query('DELETE FROM items WHERE id = $1 AND user_id = $2', [id, user_id]);
     return NextResponse.json(
-      { success: true },
+      { message: 'Item deleted successfully' },
       { headers: corsHeaders() }
     );
   } catch (error) {

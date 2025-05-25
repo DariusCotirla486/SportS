@@ -131,7 +131,7 @@ export default function EquipmentList({ activeCategoryId, priceSort }: Equipment
                         <div className="p-4">
                             <h3 className="text-lg font-semibold text-gray-900">{item.name}</h3>
                             <p className="text-sm text-gray-600">{item.brand}</p>
-                            <p className="text-lg font-bold text-blue-600 mt-2">${item.price.toFixed(2)}</p>
+                            <p className="text-lg font-bold text-blue-600 mt-2">${Number(item.price).toFixed(2)}</p>
                             <p className="text-sm text-gray-500 mt-1">In Stock: {item.quantity}</p>
                             <div className="mt-4 flex justify-between">
                                 <button
