@@ -19,12 +19,12 @@ export function useEquipment() {
           sort_order: 'none'
         })
       });
-
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to fetch equipment');
       }
-
+      
       const data = await response.json();
       setEquipment(data);
     } catch (err) {
@@ -48,7 +48,7 @@ export function useEquipment() {
         },
         body: JSON.stringify(newEquipment),
       });
-
+      
       if (!response.ok) {
         throw new Error('Failed to add equipment');
       }
@@ -69,7 +69,7 @@ export function useEquipment() {
         },
         body: JSON.stringify(updatedEquipment),
       });
-
+      
       if (!response.ok) {
         throw new Error('Failed to update equipment');
       }
@@ -86,7 +86,7 @@ export function useEquipment() {
       const response = await fetch(`/api/equipment?id=${id}`, {
         method: 'DELETE',
       });
-
+      
       if (!response.ok) {
         throw new Error('Failed to delete equipment');
       }

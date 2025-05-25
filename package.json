@@ -2,22 +2,34 @@
   "name": "new-project",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "build:worker": "tsx src/scripts/build.ts",
+    "cleanup": "npm run build:worker && tsx src/scripts/cleanup.ts",
+    "cleanup:categories": "tsx src/scripts/cleanup/cleanupCategories.ts",
+    "cleanup:items": "tsx src/scripts/cleanup/cleanupItems.ts",
+    "cleanup:stock": "tsx src/scripts/cleanup/cleanupStock.ts",
+    "generate:categories": "tsx src/scripts/generate/generateCategories.ts",
+    "generate:items": "tsx src/scripts/generate/generateItems.ts",
+    "generate:stock": "tsx src/scripts/generate/generateStock.ts"
   },
   "dependencies": {
+    "@faker-js/faker": "^9.8.0",
+    "@prisma/client": "^6.8.2",
     "@types/mssql": "^9.1.7",
-    "@types/pg": "^8.15.1",
     "chart.js": "^4.4.9",
+    "faker": "^6.6.6",
     "msnodesqlv8": "^4.5.0",
     "mssql": "^11.0.1",
     "next": "15.3.2",
     "pg": "^8.15.6",
+    "prisma": "^6.8.2",
     "react": "^19.0.0",
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^19.0.0",
@@ -25,11 +37,16 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/faker": "^6.6.8",
     "@types/node": "^20",
+    "@types/pg": "^8.15.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^4.4.1",
+    "esbuild": "^0.25.4",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.4",
     "typescript": "^5"
   }
 }

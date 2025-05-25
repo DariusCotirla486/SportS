@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     } catch (dbError) {
       console.error('Database query error:', dbError);
       throw new Error(`Database query failed: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`);
-    }
+  }
   } catch (error) {
     console.error('Error filtering items:', error);
     return NextResponse.json(

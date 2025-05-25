@@ -17,12 +17,12 @@ export interface Category {
     id: string;
     name: string;
     created_at: Date;
-}
-
-export type SortField = 'name' | 'price' | 'category' | 'inStock';
-export type SortOrder = 'asc' | 'desc';
-
-export interface FilterOptions {
+  }
+  
+  export type SortField = 'name' | 'price' | 'category' | 'inStock';
+  export type SortOrder = 'asc' | 'desc';
+  
+  export interface FilterOptions {
     categoryId?: string;
     sortOrder?: 'none' | 'high-low' | 'low-high';
-} 
+  } 
