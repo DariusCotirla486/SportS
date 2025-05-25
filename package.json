@@ -17,7 +17,8 @@
     "cleanup:stock": "tsx src/scripts/cleanup/cleanupStock.ts",
     "generate:categories": "tsx src/scripts/generate/generateCategories.ts",
     "generate:items": "tsx src/scripts/generate/generateItems.ts",
-    "generate:stock": "tsx src/scripts/generate/generateStock.ts"
+    "generate:stock": "tsx src/scripts/generate/generateStock.ts",
+    "optimize": "tsx src/scripts/optimize/optimizeDatabase.ts"
   },
   "dependencies": {
     "@faker-js/faker": "^9.8.0",

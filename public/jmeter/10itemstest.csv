@@ -1,0 +1,4 @@
+Label,# Samples,Average,Median,90% Line,95% Line,99% Line,Min,Max,Error %,Throughput,Received KB/sec,Sent KB/sec
+Get Equipment,50,667,585,1192,1229,1302,488,1302,0.000%,3.48578,1.10,0.65
+Get Categories,50,788,654,854,1788,1954,521,1954,0.000%,3.60542,2.39,0.67
+TOTAL,100,727,628,1192,1302,1907,488,1954,0.000%,6.64805,3.25,1.24
