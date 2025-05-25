@@ -12,14 +12,17 @@ export interface SportEquipment {
     created_at: Date;
     updated_at: Date;
 }
-  
+
+export interface Category {
+    id: string;
+    name: string;
+    created_at: Date;
+}
+
 export type SortField = 'name' | 'price' | 'category' | 'inStock';
 export type SortOrder = 'asc' | 'desc';
-  
+
 export interface FilterOptions {
-    category?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    condition?: string;
-    searchQuery?: string;
+    categoryId?: string;
+    sortOrder?: 'none' | 'high-low' | 'low-high';
 } 

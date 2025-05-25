@@ -44,7 +44,7 @@ export default function AddEquipmentForm() {
                 body: JSON.stringify({
                     name,
                     brand,
-                    category_id: category,
+                    category,
                     price: parseFloat(price),
                     description,
                     condition,

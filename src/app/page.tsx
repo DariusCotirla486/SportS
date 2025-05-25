@@ -1,14 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { SportEquipment } from '@/lib/db';
+import { SportEquipment } from '@/types/types';
 import EquipmentList from '@/components/EquipmentList';
 import FilterSort from '@/components/FilterSort';
 import EquipmentCharts from '@/components/EquipmentCharts';
 import { useEquipment } from '@/hooks/useEquipment';
 
 export default function Home() {
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [priceSort, setPriceSort] = useState<'none' | 'high-low' | 'low-high'>('none');
   const { equipment } = useEquipment();
 
@@ -22,16 +22,16 @@ export default function Home() {
         <EquipmentCharts equipment={equipment} />
 
         <FilterSort
-          onCategoryChange={setActiveCategory}
+          onCategoryChange={setActiveCategoryId}
           onPriceSortChange={setPriceSort}
-          activeCategory={activeCategory}
+          activeCategoryId={activeCategoryId}
           priceSort={priceSort}
         />
 
         <EquipmentList 
-          activeCategory={activeCategory} 
+          activeCategoryId={activeCategoryId} 
           priceSort={priceSort} 
-          />
+        />
       </div>
     </main>
   );

@@ -22,73 +22,64 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
+    console.log('Received filter request:', data);
+
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid request body');
+    }
+
     const pool = await getConnection();
+    console.log('Database connection established');
 
-    // Build the query based on filters
-    let query = 'SELECT * FROM get_all_items() WHERE 1=1';
-    const params: any[] = [];
-    let paramIndex = 1;
-
-    if (data.name) {
-      query += ` AND name ILIKE $${paramIndex}`;
-      params.push(`%${data.name}%`);
-      paramIndex++;
+    // Convert sort order to match the function's expected format
+    let sortOrder = 'none';
+    if (data.sort_by === 'price') {
+      sortOrder = data.sort_order === 'asc' ? 'low-high' : 'high-low';
     }
 
-    if (data.brand) {
-      query += ` AND brand ILIKE $${paramIndex}`;
-      params.push(`%${data.brand}%`);
-      paramIndex++;
-    }
-
+    // Validate category_id if provided
+    let categoryId = null;
     if (data.category_id) {
-      query += ` AND category_id = $${paramIndex}`;
-      params.push(data.category_id);
-      paramIndex++;
-    }
-
-    if (data.condition) {
-      query += ` AND condition = $${paramIndex}`;
-      params.push(data.condition);
-      paramIndex++;
-    }
-
-    if (data.min_price !== undefined) {
-      query += ` AND price >= $${paramIndex}`;
-      params.push(data.min_price);
-      paramIndex++;
-    }
-
-    if (data.max_price !== undefined) {
-      query += ` AND price <= $${paramIndex}`;
-      params.push(data.max_price);
-      paramIndex++;
-    }
-
-    if (data.in_stock !== undefined) {
-      if (data.in_stock) {
-        query += ' AND quantity > 0';
-      } else {
-        query += ' AND quantity = 0';
+      try {
+        // Validate UUID format
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.category_id)) {
+          throw new Error('Invalid category_id format');
+        }
+        categoryId = data.category_id;
+      } catch (error) {
+        console.error('Invalid category_id:', error);
+        throw new Error('Invalid category_id format');
       }
     }
 
-    // Add sorting
-    if (data.sort_by) {
-      const validSortColumns = ['name', 'brand', 'price', 'created_at', 'updated_at'];
-      const sortColumn = validSortColumns.includes(data.sort_by) ? data.sort_by : 'created_at';
-      const sortOrder = data.sort_order?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-      query += ` ORDER BY ${sortColumn} ${sortOrder}`;
-    } else {
-      query += ' ORDER BY created_at DESC';
-    }
+    console.log('Executing query with params:', { category_id: categoryId, sortOrder });
 
-    const result = await pool.query(query, params);
-    return NextResponse.json(result.rows, { headers: corsHeaders() });
+    try {
+      // Call the PostgreSQL function
+      const result = await pool.query(
+        'SELECT * FROM get_filtered_items($1, $2)',
+        [categoryId, sortOrder]
+      );
+
+      console.log('Query executed successfully, rows returned:', result.rows.length);
+
+      // Convert dates to ISO strings and ensure price is a number
+      const formattedRows = result.rows.map(row => ({
+        ...row,
+        price: Number(row.price), // Convert price to number
+        created_at: row.created_at.toISOString(),
+        updated_at: row.updated_at.toISOString()
+      }));
+
+      return NextResponse.json(formattedRows, { headers: corsHeaders() });
+    } catch (dbError) {
+      console.error('Database query error:', dbError);
+      throw new Error(`Database query failed: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`);
+    }
   } catch (error) {
     console.error('Error filtering items:', error);
     return NextResponse.json(
-      { error: 'Failed to filter items' },
+      { error: error instanceof Error ? error.message : 'Failed to filter items' },
       { status: 500, headers: corsHeaders() }
     );
   }

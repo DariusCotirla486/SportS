@@ -11,9 +11,23 @@ const config = {
 // Create a connection pool
 const pool = new Pool(config);
 
+// Add error handler to the pool
+pool.on('error', (err) => {
+    console.error('Unexpected error on idle client', err);
+    process.exit(-1);
+});
+
 // Export a function to get the pool
 export async function getConnection() {
-    return pool;
+    try {
+        // Test the connection
+        const client = await pool.connect();
+        client.release();
+        return pool;
+    } catch (error) {
+        console.error('Error connecting to the database:', error);
+        throw new Error('Failed to connect to the database. Please check if PostgreSQL is running and the credentials are correct.');
+    }
 }
 
 export interface SportEquipment {

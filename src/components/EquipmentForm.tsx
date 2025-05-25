@@ -1,7 +1,8 @@
 'use client';
 
-import { SportEquipment } from '@/lib/db';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { SportEquipment } from '@/types/types';
+import { Category } from '@/types/types';
 
 interface EquipmentFormProps {
   onClose: () => void;
@@ -10,57 +11,108 @@ interface EquipmentFormProps {
 }
 
 export default function EquipmentForm({ onClose, equipment, onUpdate }: EquipmentFormProps) {
-  const [formData, setFormData] = useState<Partial<SportEquipment>>(
-    equipment || {
-      name: '',
-      category: '',
-      price: 0,
-      brand: '',
-      inStock: 0,
-      description: '',
-      condition: '',
-      imageUrl: ''
-    }
-  );
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>(equipment?.imageUrl || '');
+  const [formData, setFormData] = useState<Partial<SportEquipment>>({
+    name: '',
+    brand: '',
+    category_id: '',
+    price: 0,
+    description: '',
+    condition: 'New',
+    image_filename: null,
+    quantity: 0
+  });
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  useEffect(() => {
+    // Fetch categories when component mounts
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/categories');
+        if (!response.ok) {
+          throw new Error('Failed to fetch categories');
+        }
+        const data = await response.json();
+        setCategories(data);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        setError('Failed to load categories');
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    if (equipment) {
+      setFormData({
+        name: equipment.name,
+        brand: equipment.brand,
+        category_id: equipment.category_id,
+        price: equipment.price,
+        description: equipment.description || '',
+        condition: equipment.condition,
+        image_filename: equipment.image_filename || null,
+        quantity: equipment.quantity
+      });
+    }
+  }, [equipment]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'price' || name === 'inStock' ? Number(value) : value
+      [name]: name === 'price' || name === 'quantity' ? Number(value) : value
     }));
-  };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
-        setFormData(prev => ({
-          ...prev,
-          imageUrl: reader.result as string
-        }));
-      };
-      reader.readAsDataURL(file);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    setError(null);
+
     try {
+      // First, upload the image if there is one
+      let imageFilename: string | null = formData.image_filename || null;
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append('file', imageFile);
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to upload image');
+        }
+        const uploadData = await uploadResponse.json();
+        imageFilename = uploadData.filename;
+      }
+
+      const equipmentData: SportEquipment = {
+        id: equipment?.id || '',
+        name: formData.name || '',
+        brand: formData.brand || '',
+        category_id: formData.category_id || '',
+        category_name: categories.find(c => c.id === formData.category_id)?.name || '',
+        price: formData.price || 0,
+        description: formData.description || '',
+        condition: formData.condition || 'New',
+        image_filename: imageFilename,
+        quantity: formData.quantity || 0,
+        created_at: equipment?.created_at || new Date(),
+        updated_at: new Date()
+      };
+
       if (onUpdate) {
-        const equipmentData = equipment 
-          ? formData 
-          : { ...formData, id: Date.now().toString() };
-        onUpdate(equipmentData as SportEquipment);
+        onUpdate(equipmentData);
       }
       onClose();
     } catch (error) {
       console.error('Error saving equipment:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -70,6 +122,11 @@ export default function EquipmentForm({ onClose, equipment, onUpdate }: Equipmen
         <h2 className="text-2xl font-bold text-black mb-4">
           {equipment ? 'Edit Equipment' : 'Add New Equipment'}
         </h2>
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-black font-medium mb-1">Name</label>
@@ -84,15 +141,33 @@ export default function EquipmentForm({ onClose, equipment, onUpdate }: Equipmen
           </div>
 
           <div>
-            <label className="block text-black font-medium mb-1">Category</label>
+            <label className="block text-black font-medium mb-1">Brand</label>
             <input
               type="text"
-              name="category"
-              value={formData.category}
+              name="brand"
+              value={formData.brand}
               onChange={handleChange}
               className="w-full p-2 border border-gray-300 rounded text-black"
               required
             />
+          </div>
+
+          <div>
+            <label className="block text-black font-medium mb-1">Category</label>
+            <select
+              name="category_id"
+              value={formData.category_id}
+              onChange={handleChange}
+              className="w-full p-2 border border-gray-300 rounded text-black"
+              required
+            >
+              <option value="">Select a category</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -110,23 +185,11 @@ export default function EquipmentForm({ onClose, equipment, onUpdate }: Equipmen
           </div>
 
           <div>
-            <label className="block text-black font-medium mb-1">Brand</label>
-            <input
-              type="text"
-              name="brand"
-              value={formData.brand}
-              onChange={handleChange}
-              className="w-full p-2 border border-gray-300 rounded text-black"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-black font-medium mb-1">In Stock</label>
+            <label className="block text-black font-medium mb-1">Quantity</label>
             <input
               type="number"
-              name="inStock"
-              value={formData.inStock}
+              name="quantity"
+              value={formData.quantity}
               onChange={handleChange}
               className="w-full p-2 border border-gray-300 rounded text-black"
               required
@@ -138,24 +201,28 @@ export default function EquipmentForm({ onClose, equipment, onUpdate }: Equipmen
             <label className="block text-black font-medium mb-1">Description</label>
             <textarea
               name="description"
-              value={formData.description}
+              value={formData.description || ''}
               onChange={handleChange}
               className="w-full p-2 border border-gray-300 rounded text-black"
-              required
               rows={3}
             />
           </div>
 
           <div>
             <label className="block text-black font-medium mb-1">Condition</label>
-            <input
-              type="text"
+            <select
               name="condition"
               value={formData.condition}
               onChange={handleChange}
               className="w-full p-2 border border-gray-300 rounded text-black"
               required
-            />
+            >
+              <option value="New">New</option>
+              <option value="Like New">Like New</option>
+              <option value="Good">Good</option>
+              <option value="Fair">Fair</option>
+              <option value="Poor">Poor</option>
+            </select>
           </div>
 
           <div>
@@ -163,19 +230,9 @@ export default function EquipmentForm({ onClose, equipment, onUpdate }: Equipmen
             <input
               type="file"
               accept="image/*"
-              onChange={handleImageChange}
+              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
               className="w-full p-2 border border-gray-300 rounded text-black"
-              required={!equipment}
             />
-            {previewUrl && (
-              <div className="mt-2">
-                <img
-                  src={previewUrl}
-                  alt="Preview"
-                  className="w-32 h-32 object-cover rounded"
-                />
-              </div>
-            )}
           </div>
 
           <div className="flex justify-end space-x-4 mt-6">
@@ -183,14 +240,16 @@ export default function EquipmentForm({ onClose, equipment, onUpdate }: Equipmen
               type="button"
               onClick={onClose}
               className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              disabled={loading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              disabled={loading}
             >
-              {equipment ? 'Update' : 'Add'} Equipment
+              {loading ? 'Saving...' : equipment ? 'Update' : 'Add'} Equipment
             </button>
           </div>
         </form>
