@@ -1,4 +1,5 @@
 import { sql } from '@vercel/postgres';
+import { getConnection } from './db';
 
 // Constants for monitoring
 const SUSPICIOUS_OPERATIONS_THRESHOLD = 50; // Number of operations
@@ -33,7 +34,7 @@ export async function checkSuspiciousActivity() {
                 user_id,
                 COUNT(*) as operation_count
             FROM operation_logs
-            WHERE created_at > ${timeWindow}
+            WHERE created_at > ${timeWindow.toISOString()}
             GROUP BY user_id
             HAVING COUNT(*) > ${SUSPICIOUS_OPERATIONS_THRESHOLD}
         `;
@@ -51,23 +52,71 @@ export async function checkSuspiciousActivity() {
     }
 }
 
-// Get monitored users
+export interface SuspiciousUser {
+  user_id: string;
+  email: string;
+  name: string;
+  operation_count: number;
+  last_operation: Date;
+  reason: string;
+}
+
+export async function checkSuspiciousUsers(): Promise<SuspiciousUser[]> {
+  const pool = await getConnection();
+  
+  // Find users with more than 2 operations in the last minute
+  const result = await pool.query(`
+    WITH recent_operations AS (
+      SELECT 
+        user_id,
+        COUNT(*) as operation_count,
+        MAX(created_at) as last_operation
+      FROM operation_logs
+      WHERE created_at > NOW() - INTERVAL '1 minute'
+      GROUP BY user_id
+      HAVING COUNT(*) >= 2
+    )
+    SELECT 
+      ro.user_id,
+      u.email,
+      u.name,
+      ro.operation_count,
+      ro.last_operation,
+      'Multiple operations in short time' as reason
+    FROM recent_operations ro
+    JOIN users u ON ro.user_id = u.id
+    LEFT JOIN monitored_users mu ON ro.user_id = mu.user_id
+    WHERE mu.id IS NULL
+  `);
+
+  // Add suspicious users to monitored_users table
+  for (const user of result.rows) {
+    await pool.query(`
+      INSERT INTO monitored_users (user_id, reason)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id) DO NOTHING
+    `, [user.user_id, user.reason]);
+  }
+
+  return result.rows;
+}
+
+// Function to get all monitored users
 export async function getMonitoredUsers() {
-    try {
-        const result = await sql`
-            SELECT 
-                m.*,
-                u.email,
-                u.name
-            FROM monitored_users m
-            JOIN users u ON u.id = m.user_id
-            ORDER BY m.created_at DESC
-        `;
-        return result.rows;
-    } catch (error) {
-        console.error('Error getting monitored users:', error);
-        return [];
-    }
+  const pool = await getConnection();
+  const result = await pool.query(`
+    SELECT 
+      mu.id,
+      mu.user_id,
+      mu.reason,
+      mu.created_at,
+      u.email,
+      u.name
+    FROM monitored_users mu
+    JOIN users u ON mu.user_id = u.id
+    ORDER BY mu.created_at DESC
+  `);
+  return result.rows;
 }
 
 // Check if user is monitored

@@ -8,10 +8,8 @@ interface MonitoredUser {
   user_id: string;
   reason: string;
   created_at: string;
-  user: {
-    email: string;
-    name: string;
-  };
+  email: string;
+  name: string;
 }
 
 export default function AdminDashboard() {
@@ -103,12 +101,12 @@ export default function AdminDashboard() {
                   <tr key={monitoredUser.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {monitoredUser.user.name}
+                        {monitoredUser.name}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-500">
-                        {monitoredUser.user.email}
+                        {monitoredUser.email}
                       </div>
                     </td>
                     <td className="px-6 py-4">

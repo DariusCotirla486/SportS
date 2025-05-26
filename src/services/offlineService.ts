@@ -1,4 +1,4 @@
-import { SportEquipment } from '@/lib/db';
+import { SportEquipment } from '@/types/types';
 
 interface PendingOperation {
   type: 'CREATE' | 'UPDATE' | 'DELETE';

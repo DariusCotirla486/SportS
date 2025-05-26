@@ -39,7 +39,7 @@ export default function Home() {
   const handleLogout = () => {
     localStorage.removeItem('user_id');
     localStorage.removeItem('user_role');
-    setUser(null);
+      setUser(null);
   };
 
   if (loading) {

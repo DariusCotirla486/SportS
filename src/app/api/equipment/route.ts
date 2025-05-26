@@ -91,6 +91,12 @@ export async function POST(request: NextRequest) {
         [result.rows[0].id, item.quantity]
       );
     }
+    // Log operation
+    await pool.query(
+      `INSERT INTO operation_logs (user_id, action, entity_type, entity_id, details)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [user_id, 'CREATE', 'item', result.rows[0].id, JSON.stringify(item)]
+    );
     const fullItem = await pool.query(
       `SELECT i.*, c.name as category_name, s.quantity
        FROM items i
@@ -157,6 +163,12 @@ export async function PUT(request: NextRequest) {
         [id, updates.quantity]
       );
     }
+    // Log operation
+    await pool.query(
+      `INSERT INTO operation_logs (user_id, action, entity_type, entity_id, details)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [user_id, 'UPDATE', 'item', id, JSON.stringify(updates)]
+    );
     const fullItem = await pool.query(
       `SELECT i.*, c.name as category_name, s.quantity
        FROM items i
@@ -203,6 +215,12 @@ export async function DELETE(request: NextRequest) {
     await pool.query('DELETE FROM item_stock WHERE item_id = $1', [id]);
     // Delete the item
     await pool.query('DELETE FROM items WHERE id = $1 AND user_id = $2', [id, user_id]);
+    // Log operation
+    await pool.query(
+      `INSERT INTO operation_logs (user_id, action, entity_type, entity_id, details)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [user_id, 'DELETE', 'item', id, JSON.stringify({})]
+    );
     return NextResponse.json(
       { message: 'Item deleted successfully' },
       { headers: corsHeaders() }
